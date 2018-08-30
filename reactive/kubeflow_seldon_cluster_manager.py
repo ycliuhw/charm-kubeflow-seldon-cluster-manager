@@ -1,4 +1,7 @@
 import os
+from pathlib import Path
+
+from jinja2 import Template
 
 from charmhelpers.core import hookenv
 from charms.reactive import set_flag, clear_flag, endpoint_from_flag
@@ -37,39 +40,14 @@ def start_charm():
     image_info = layer.docker_resource.get_info('cluster-manager-image')
     redis = endpoint_from_flag('endpoint.redis.available')
     redis_application_name = redis.all_joined_units[0].application_name
-    redis_service_name = 'juju-{}'.format(redis_application_name)
     model = os.environ['JUJU_MODEL_NAME']
-    java_opts = config['java-opts']
-    spring_opts = config['spring-opts']
-    engine_image = config['engine-image']
-
-    layer.caas_base.pod_spec_set({
-        'containers': [
-            {
-                'name': 'seldon-cluster-manager',
-                'imageDetails': {
-                    'imagePath': image_info.registry_path,
-                    'username': image_info.username,
-                    'password': image_info.password,
-                },
-                'ports': [
-                    {
-                        'name': 'cluster-manager',
-                        'containerPort': 8080,
-                    },
-                ],
-                'config': {
-                    'SELDON_CLUSTER_MANAGER_REDIS_HOST': redis_service_name,
-                    'SELDON_CLUSTER_MANAGER_POD_NAMESPACE': model,
-                    'JAVA_OPTS': java_opts,
-                    'SPRING_OPTS': spring_opts,
-                    'ENGINE_CONTAINER_IMAGE_AND_VERSION': engine_image,
-                },
-                'files': [
-                ],
-            },
-        ],
-    })
+    rendered_podspec = Template(Path('reactive/podspec.yaml.j2').read_text()).render(
+        model=model,
+        config=config,
+        image_info=image_info,
+        redis_application_name=redis_application_name,
+    )
+    layer.caas_base.pod_spec_set(rendered_podspec)
 
     layer.status.maintenance('creating container')
     set_flag('charm.kubeflow-seldon-cluster-manager.started')
