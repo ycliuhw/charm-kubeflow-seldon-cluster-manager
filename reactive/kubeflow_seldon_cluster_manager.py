@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 
+import yaml
 from jinja2 import Template
 
 from charmhelpers.core import hookenv
@@ -47,7 +48,7 @@ def start_charm():
         image_info=image_info,
         redis_application_name=redis_application_name,
     )
-    layer.caas_base.pod_spec_set(rendered_podspec)
+    layer.caas_base.pod_spec_set(yaml.load(rendered_podspec))
 
     layer.status.maintenance('creating container')
     set_flag('charm.kubeflow-seldon-cluster-manager.started')
